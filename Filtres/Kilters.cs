@@ -9,6 +9,8 @@ namespace Filtres
 {
      abstract class Filters
     {
+         public int Rm = -1, Gm, Bm;
+
         protected abstract Color calculateNewPixelColor(Bitmap sourseImage, int x, int y);
 
         public Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
@@ -24,7 +26,7 @@ namespace Filtres
                     resultImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
                 }
             }
-
+            Rm = -1;
             return resultImage;
         }
 
@@ -92,21 +94,44 @@ namespace Filtres
                  Clamp((int)resultB, 0, 255));
          }
      }
-//Не робит
      class PerenosFilter : Filters
      {
          protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
          {
-             Color resultColor = sourseImage.GetPixel(x + 50, y);
-             double resultR = resultColor.R,
-                    resultG = resultColor.G,
-                    resultB = resultColor.B;
+             int resultR = 0, resultG = 0, resultB = 0;
 
-             return Color.FromArgb(
-                 Clamp((int)resultR, 0, 255),
-                 Clamp((int)resultG, 0, 255),
-                 Clamp((int)resultB, 0, 255));
+             if (x + 50 < sourseImage.Width)
+             {
+                 Color resultColor = sourseImage.GetPixel(x+50, y);
+                 resultR = resultColor.R;
+                 resultG = resultColor.G;
+                 resultB = resultColor.B;
+             }
+             return Color.FromArgb(resultR, resultG, resultB);
+
          }
+     }
+     class PovorotFilter : Filters
+     {
+         protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
+         {
+             int x0 = sourseImage.Width / 2, y0 = sourseImage.Height / 2, m=20;
+             int resultR = 0, resultG = 0, resultB = 0;
+
+             int k = (int)((x - x0) * Math.Cos(m) - (y - y0) * Math.Sin(m) + x0);
+             int l = (int)((x - x0) * Math.Sin(m) + (y - y0) * Math.Cos(m) + y0);
+
+             if (k > 0 && k < sourseImage.Width && l > 0 && l < sourseImage.Height)
+             {
+                 Color resultColor = sourseImage.GetPixel(k, l);
+                 resultR = resultColor.R;
+                 resultG = resultColor.G;
+                 resultB = resultColor.B;
+             }
+             return Color.FromArgb(resultR, resultG, resultB);
+         }
+
+
      }
 
      class MatrixFilter : Filters
@@ -288,56 +313,102 @@ namespace Filtres
  //Не робит
      class GreyWorldFilter : Filters
      {
-         private double _R=0, _G=0, _B=0, Avg=0;
+         int Avg;
 
-         public void GetZn(Bitmap sourceImage)
+         void GetZn(Bitmap sourceImage)
          {
-             int N = 5;
+             Rm = Bm = Gm = 0;
+             int N = 0;
              Color tmpColor;
              for (int i = 0; i < sourceImage.Width; i++)
                  for (int j = 0; j < sourceImage.Height; j++)
                  {
                      tmpColor = sourceImage.GetPixel(i, j);
-                     _R += tmpColor.R;
-                     _G += tmpColor.G;
-                     _B += tmpColor.B;
+                     Rm += tmpColor.R;
+                     Gm += tmpColor.G;
+                     Bm += tmpColor.B;
+                     N++;
                  }
 
-             _R = _R / N;
-             _G = _G / N;
-             _B = _B / N;
-             Avg = (_R + _G + _B) / 3;
+             Rm = Rm / N;
+             Gm = Gm / N;
+             Bm = Bm / N;
+             Avg = (Rm + Gm + Bm) / 3;
          }
 
 
          protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
          {
+//             Color sourseColor = sourseImage.GetPixel(x, y);
+//             GetZn(sourseImage);
+
+             if (Rm == -1)
+                 GetZn(sourseImage);
+
              Color sourseColor = sourseImage.GetPixel(x, y);
-             GetZn(sourseImage);
-
-             double resultR = sourseColor.R * Avg / _R,
-                    resultG = sourseColor.G * Avg / _G,
-                    resultB = sourseColor.B * Avg / _B;
-
+/*             double intensity = (Avg / Rm) * sourseColor.R + (Avg / Gm) * sourseColor.G + (Avg / Bm) * sourseColor.B;
              return Color.FromArgb(
-                 Clamp((int)resultR, 0, 255),
-                 Clamp((int)resultG, 0, 255),
-                 Clamp((int)resultB, 0, 255));
+                 Clamp((int)intensity, 0, 255),
+                 Clamp((int)intensity, 0, 255),
+                 Clamp((int)intensity, 0, 255));
 
+
+           */              double resultR = (Avg / Rm) * sourseColor.R,
+                                 resultG = (Avg / Gm) * sourseColor.G,
+                                 resultB = (Avg / Bm) * sourseColor.B;
+
+                          return Color.FromArgb(
+                              Clamp((int)resultR, 0, 255),
+                              Clamp((int)resultG, 0, 255),
+                              Clamp((int)resultB, 0, 255));
+            
          }  
+     }
+     class IdealityFilter : Filters
+     {
+         void GetMax (Bitmap sourseImage)
+         {
+             Rm = Bm = Gm = 0;
+             Color C;
+             for (int i = 0; i < sourseImage.Width; i++)
+                 for (int j = 0; j < sourseImage.Height; j++)
+                 {
+                     C = sourseImage.GetPixel(i,j);
+                     if (Rm < C.R)
+                         Rm = C.R;
+                     if (Gm < C.G)
+                         Gm = C.G;
+                     if (Bm < C.B)
+                         Bm = C.B;
+                 }
+         }
+         protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
+         {
+             if (Rm == -1)
+                 GetMax(sourseImage);
+
+             Color sourseColor = sourseImage.GetPixel(x, y);
+             double intensity = (255 / Rm) * sourseColor.R + (255 / Gm) * sourseColor.G + (255 / Bm) * sourseColor.B;
+             return Color.FromArgb(
+                 Clamp((int)intensity, 0, 255),
+                 Clamp((int)intensity, 0, 255),
+                 Clamp((int)intensity, 0, 255));
+         }
+
+
      }
 //Rasshirenie
      class DelatiomFilter : MatrixFilter
      {
   //       private double MaxIntens;
-         public DelatiomFilter()
+  /*       public DelatiomFilter()
          {
              int size = 3;
              kernel = new float[size, size];
              kernel[0, 0] = kernel[0, 2] = kernel[2, 0] = kernel[2, 2] = 0;
              kernel[0, 1] = kernel[1, 0] = kernel[1, 1] = kernel[1, 2] = kernel[2, 1] = 1;
          }
-
+*/
   /*      void GetMaxIntensive (Bitmap sourseImage, int x, int y) 
          {
              Color sourseColor;

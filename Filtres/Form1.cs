@@ -187,6 +187,18 @@ namespace Filtres
             backgroundWorker1.RunWorkerAsync(filter);
         }
 
+        private void поворотToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new PovorotFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
+        private void идеальныйОтражательToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new IdealityFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
 
 
 
