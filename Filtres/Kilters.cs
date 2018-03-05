@@ -401,14 +401,14 @@ namespace Filtres
      class DelatiomFilter : MatrixFilter
      {
   //       private double MaxIntens;
-  /*       public DelatiomFilter()
+         public DelatiomFilter()
          {
              int size = 3;
              kernel = new float[size, size];
              kernel[0, 0] = kernel[0, 2] = kernel[2, 0] = kernel[2, 2] = 0;
              kernel[0, 1] = kernel[1, 0] = kernel[1, 1] = kernel[1, 2] = kernel[2, 1] = 1;
          }
-*/
+
   /*      void GetMaxIntensive (Bitmap sourseImage, int x, int y) 
          {
              Color sourseColor;
