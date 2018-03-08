@@ -9,11 +9,11 @@ namespace Filtres
 {
      abstract class Filters
     {
-         public int Rm = -1, Gm, Bm;
+         
 
         protected abstract Color calculateNewPixelColor(Bitmap sourseImage, int x, int y);
 
-        public Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+        public virtual Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
         {
             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
             for (int i = 0; i < sourceImage.Width; i++)
@@ -26,7 +26,7 @@ namespace Filtres
                     resultImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
                 }
             }
-            Rm = -1;
+            
             return resultImage;
         }
 
@@ -310,15 +310,13 @@ namespace Filtres
              kernel[1, 1] = 5;
          }
      }
- //Не робит
      class GreyWorldFilter : Filters
      {
-         int Avg;
-
+         double Rm = -1, Gm, Bm, Avg;
          void GetZn(Bitmap sourceImage)
          {
-             Rm = Bm = Gm = 0;
-             int N = 0;
+             Rm = Bm = Gm = 0.0;
+             int N = sourceImage.Width * sourceImage.Height;
              Color tmpColor;
              for (int i = 0; i < sourceImage.Width; i++)
                  for (int j = 0; j < sourceImage.Height; j++)
@@ -327,7 +325,6 @@ namespace Filtres
                      Rm += tmpColor.R;
                      Gm += tmpColor.G;
                      Bm += tmpColor.B;
-                     N++;
                  }
 
              Rm = Rm / N;
@@ -336,94 +333,268 @@ namespace Filtres
              Avg = (Rm + Gm + Bm) / 3;
          }
 
-
          protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
          {
-//             Color sourseColor = sourseImage.GetPixel(x, y);
-//             GetZn(sourseImage);
-
              if (Rm == -1)
                  GetZn(sourseImage);
-
              Color sourseColor = sourseImage.GetPixel(x, y);
-/*             double intensity = (Avg / Rm) * sourseColor.R + (Avg / Gm) * sourseColor.G + (Avg / Bm) * sourseColor.B;
+             double resultR = (Avg / Rm) * sourseColor.R,
+                    resultG = (Avg / Gm) * sourseColor.G,
+                    resultB = (Avg / Bm) * sourseColor.B;
+
              return Color.FromArgb(
-                 Clamp((int)intensity, 0, 255),
-                 Clamp((int)intensity, 0, 255),
-                 Clamp((int)intensity, 0, 255));
-
-
-           */              double resultR = (Avg / Rm) * sourseColor.R,
-                                 resultG = (Avg / Gm) * sourseColor.G,
-                                 resultB = (Avg / Bm) * sourseColor.B;
-
-                          return Color.FromArgb(
-                              Clamp((int)resultR, 0, 255),
-                              Clamp((int)resultG, 0, 255),
-                              Clamp((int)resultB, 0, 255));
+                    Clamp((int)resultR, 0, 255),
+                    Clamp((int)resultG, 0, 255),
+                    Clamp((int)resultB, 0, 255));
             
          }  
      }
-     class IdealityFilter : Filters
+
+     class MorfologyFilter : MatrixFilter
      {
-         void GetMax (Bitmap sourseImage)
+         protected int iter;
+         public MorfologyFilter()
          {
-             Rm = Bm = Gm = 0;
-             Color C;
-             for (int i = 0; i < sourseImage.Width; i++)
-                 for (int j = 0; j < sourseImage.Height; j++)
-                 {
-                     C = sourseImage.GetPixel(i,j);
-                     if (Rm < C.R)
-                         Rm = C.R;
-                     if (Gm < C.G)
-                         Gm = C.G;
-                     if (Bm < C.B)
-                         Bm = C.B;
-                 }
-         }
-         protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
-         {
-             if (Rm == -1)
-                 GetMax(sourseImage);
-
-             Color sourseColor = sourseImage.GetPixel(x, y);
-             double intensity = (255 / Rm) * sourseColor.R + (255 / Gm) * sourseColor.G + (255 / Bm) * sourseColor.B;
-             return Color.FromArgb(
-                 Clamp((int)intensity, 0, 255),
-                 Clamp((int)intensity, 0, 255),
-                 Clamp((int)intensity, 0, 255));
-         }
-
-
-     }
-//Rasshirenie
-     class DelatiomFilter : MatrixFilter
-     {
-  //       private double MaxIntens;
-         public DelatiomFilter()
-         {
+             iter = 0;
              int size = 3;
              kernel = new float[size, size];
              kernel[0, 0] = kernel[0, 2] = kernel[2, 0] = kernel[2, 2] = 0;
              kernel[0, 1] = kernel[1, 0] = kernel[1, 1] = kernel[1, 2] = kernel[2, 1] = 1;
          }
-
-  /*      void GetMaxIntensive (Bitmap sourseImage, int x, int y) 
+         protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
          {
-             Color sourseColor;
-             double mintens = 0, tmpintens;
-             for (int _x = x-1; _x<=x+1; _x++)
-                 for (int _y = x-1; _y<=y+1; _y++)
+             int radiusX = kernel.GetLength(0) / 2;
+             int radiusY = kernel.GetLength(1) / 2;
+             double minintens = 300, maxintens = -1, tmpintens;
+             float resultR = 0, resultG = 0, resultB = 0;
+             for (int l = -radiusY; l <= radiusY; l++)
+                 for (int k = -radiusX; k <= radiusX; k++)
                  {
-                     sourseColor = sourseImage.GetPixel(_x, _y);
-                     tmpintens =  0.36*sourseColor.R + 0.53*sourseColor.G + 0.11*sourseColor.B;
-                     if (mintens < tmpintens)
-                         mintens = tmpintens;
+                     if (kernel[k + radiusX, l + radiusY] == 1)
+                     {
+                         int idX = Clamp(x + k, 0, sourseImage.Width - 1);
+                         int idY = Clamp(y + l, 0, sourseImage.Height - 1);
+                         Color neighborColor = sourseImage.GetPixel(idX, idY);
+                         tmpintens = 0.36 * neighborColor.R + 0.53 * neighborColor.G + 0.11 * neighborColor.B;
+                         if (iter == 1)
+                         {
+                             if (minintens > tmpintens)
+                             {
+                                 minintens = tmpintens;
+                                 resultR = neighborColor.R;
+                                 resultG = neighborColor.G;
+                                 resultB = neighborColor.B;
+                             }
+                         }
+                         if (iter == 2)
+                         {
+                             if (maxintens < tmpintens)
+                             {
+                                 maxintens = tmpintens;
+                                 resultR = neighborColor.R;
+                                 resultG = neighborColor.G;
+                                 resultB = neighborColor.B;
+                             }
+                         }
+                     }
                  }
-             MaxIntens = mintens;
+
+             return Color.FromArgb(
+                 Clamp((int)resultR, 0, 255),
+                 Clamp((int)resultG, 0, 255),
+                 Clamp((int)resultB, 0, 255));
          }
-*/
+     }
+     class OpeningFilter : MorfologyFilter
+     {
+         public override Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+         {
+             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             Bitmap tmpImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             iter = 1;
+             for (int i = 0; i < sourceImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)i / (tmpImage.Width*2) * 100));
+                 
+                 for (int j = 0; j < sourceImage.Height; j++)
+                 {
+                     tmpImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
+                 }
+             }
+             iter = 2;
+             for (int i = 0; i < tmpImage.Width; i++) 
+             {
+                worker.ReportProgress((int)((float)(i+tmpImage.Width) / (resultImage.Width*2) * 100));
+                if (worker.CancellationPending)
+                    return null;
+                for (int j = 0; j < tmpImage.Height; j++)
+                {
+                    resultImage.SetPixel(i, j, calculateNewPixelColor(tmpImage, i, j));
+             }
+        }
+
+             return resultImage;
+         }
+     }
+     class ClosingFilter : MorfologyFilter
+     {
+         public override Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+         {
+             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             Bitmap tmpImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             iter = 2;
+             for (int i = 0; i < sourceImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)i / (tmpImage.Width * 2) * 100));
+
+                 for (int j = 0; j < sourceImage.Height; j++)
+                 {
+                     tmpImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
+                 }
+             }
+             iter = 1;
+             for (int i = 0; i < tmpImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)(i + tmpImage.Width) / (resultImage.Width * 2) * 100));
+                 if (worker.CancellationPending)
+                     return null;
+                 for (int j = 0; j < tmpImage.Height; j++)
+                 {
+                     resultImage.SetPixel(i, j, calculateNewPixelColor(tmpImage, i, j));
+                 }
+             }
+
+             return resultImage;
+         }
+     }
+     class DelatiomFilter : MorfologyFilter
+     {
+         public override Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+         {
+             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             iter = 2;
+             for (int i = 0; i < sourceImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)i / resultImage.Width * 100));
+
+                 for (int j = 0; j < sourceImage.Height; j++)
+                 {
+                     resultImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
+                 }
+             }
+             return resultImage;
+         }
+     }
+     class ErosionFilter : MorfologyFilter
+     {
+         public override Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+         {
+             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             iter = 1;
+             for (int i = 0; i < sourceImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)i / resultImage.Width * 100));
+
+                 for (int j = 0; j < sourceImage.Height; j++)
+                 {
+                     resultImage.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
+                 }
+             }
+             return resultImage;
+         }
+     }
+//Ne robit
+     class BlackHatFilter : MorfologyFilter
+     {
+         public override Bitmap processImage(Bitmap sourceImage, BackgroundWorker worker)
+         {
+             Bitmap resultImage = new Bitmap(sourceImage.Width, sourceImage.Height);
+             Bitmap tmp1Image = new Bitmap(sourceImage.Width, sourceImage.Height);
+             Bitmap tmp2Image = new Bitmap(sourceImage.Width, sourceImage.Height);
+             double resultR, resultG, resultB;
+             Color tmp2color, sourcecolor;
+             iter = 1;
+             for (int i = 0; i < sourceImage.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)i / (tmp1Image.Width * 3) * 100));
+
+                 for (int j = 0; j < sourceImage.Height; j++)
+                 {
+                     tmp1Image.SetPixel(i, j, calculateNewPixelColor(sourceImage, i, j));
+                 }
+             }
+             iter = 2;
+             for (int i = 0; i < tmp1Image.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)(i + tmp1Image.Width) / (resultImage.Width * 3) * 100));
+                 if (worker.CancellationPending)
+                     return null;
+                 for (int j = 0; j < tmp1Image.Height; j++)
+                 {
+                     tmp2Image.SetPixel(i, j, calculateNewPixelColor(tmp1Image, i, j));
+                 }
+             }
+            
+             for (int i = 0; i < tmp2Image.Width; i++)
+             {
+                 worker.ReportProgress((int)((float)(i + tmp1Image.Width*2) / (resultImage.Width * 3) * 100));
+                 if (worker.CancellationPending)
+                     return null;
+                 for (int j = 0; j < tmp2Image.Height; j++)
+                 {
+                     tmp2color = tmp2Image.GetPixel(i, j);
+                     sourcecolor = sourceImage.GetPixel(i, j);
+                     resultR = tmp2color.R - sourcecolor.R;
+                     resultB = tmp2color.B - sourcecolor.B;
+                     resultG = tmp2color.G - sourcecolor.G;
+                     resultImage.SetPixel(i, j, Color.FromArgb(Clamp((int)resultR, 0, 255), Clamp((int)resultG, 0, 255), Clamp((int)resultB, 0, 255)));
+                 }
+             }
+
+             return resultImage;
+         }
+     }
+
+     class MedianFilter : MatrixFilter
+     {
+
+         protected override Color calculateNewPixelColor(Bitmap sourseImage, int x, int y)
+         {
+
+             double[] mas = new double[9];
+             float resultR = 0, resultG = 0, resultB = 0;
+             for (int l = -1; l <= 1; l++)
+                 for (int k = -1; k <= 1; k++)
+                 {
+                     int idX = Clamp(x + k, 0, sourseImage.Width - 1);
+                     int idY = Clamp(y + l, 0, sourseImage.Height - 1);
+                     Color neighborColor = sourseImage.GetPixel(idX, idY);
+                     double tmpintens = 0.36 * neighborColor.R + 0.53 * neighborColor.G + 0.11 * neighborColor.B;
+                     mas[(l + 1) * 3 + (k + 1)] = tmpintens;
+                 }
+             Array.Sort(mas);
+             double median = mas[4];
+             for (int l = -1; l <= 1; l++)
+                 for (int k = -1; k <= 1; k++)
+                 {
+                     int idX = Clamp(x + k, 0, sourseImage.Width - 1);
+                     int idY = Clamp(y + l, 0, sourseImage.Height - 1);
+                     Color neighborColor = sourseImage.GetPixel(idX, idY);
+                     double tmpintens = 0.36 * neighborColor.R + 0.53 * neighborColor.G + 0.11 * neighborColor.B;
+                     if (tmpintens == median)
+                     {
+                         resultR = neighborColor.R;
+                         resultG = neighborColor.G;
+                         resultB = neighborColor.B;
+                     }
+                         
+                 }
+             return Color.FromArgb(
+                 Clamp((int)resultR, 0, 255),
+                 Clamp((int)resultG, 0, 255),
+                 Clamp((int)resultB, 0, 255));
+         }
 
      }
 }
+         

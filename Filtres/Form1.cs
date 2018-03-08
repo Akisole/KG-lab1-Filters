@@ -193,11 +193,37 @@ namespace Filtres
             backgroundWorker1.RunWorkerAsync(filter);
         }
 
-        private void идеальныйОтражательToolStripMenuItem_Click(object sender, EventArgs e)
+        private void сужениеToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Filters filter = new IdealityFilter();
+            Filters filter = new ErosionFilter();
             backgroundWorker1.RunWorkerAsync(filter);
         }
+
+        private void открытиеToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new OpeningFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
+        private void закрытиеToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new ClosingFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
+        private void blackHatToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new BlackHatFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
+        private void медианныйToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Filters filter = new MedianFilter();
+            backgroundWorker1.RunWorkerAsync(filter);
+        }
+
+
 
 
 
